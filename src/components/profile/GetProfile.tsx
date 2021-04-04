@@ -14,13 +14,9 @@ const GetProfile = () => {
 
   const getAccessToken = async (code: string) => {
     const url = `https://childlike-wakeful-fluorine.glitch.me/api/authenticate?code=${code}`;
-    try {
-      const req = await fetch(url);
-      const res = await req.json();
-      return { res };
-    } catch (err) {
-      console.info(err);
-    }
+    const req = await fetch(url);
+    const res = await req.json();
+    return { res };
   };
 
   useEffect(() => {
@@ -42,11 +38,13 @@ const GetProfile = () => {
 
   return (
     <div>
-      Getting Profile...
+      {!error && <span className="text-green-400">Getting Profile...</span>}
       {error && (
-        <h1>
-          Something went wrong please try authenticating again
-          <Link to="/">here</Link>
+        <h1 className="text-red-400 text-center">
+          Something went wrong please try authenticating again{" "}
+          <Link to="/" className="text-blue-400">
+            here
+          </Link>
         </h1>
       )}
     </div>
