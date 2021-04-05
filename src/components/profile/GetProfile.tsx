@@ -33,19 +33,26 @@ const GetProfile = () => {
             history.push("/profile");
           }
         })
-        .catch((err) => setError(true));
+        .catch((error) => error && setError(true));
   }, [code, history]);
 
   return (
-    <div>
-      {!error && <span className="text-green-400">Getting Profile...</span>}
+    <div className="p-4 flex flex-col items-center">
+      {!error && (
+        <>
+          <span className="text-green-400 text-center">Getting Profile...</span>
+          <span className="text-gray-700 text-center mt-2">
+            Please wait patiently, your profile will be fetched soon...
+          </span>
+        </>
+      )}
       {error && (
-        <h1 className="text-red-400 text-center">
+        <h2 className="text-red-400 text-center">
           Something went wrong please try authenticating again{" "}
           <Link to="/" className="text-blue-400">
             here
           </Link>
-        </h1>
+        </h2>
       )}
     </div>
   );
