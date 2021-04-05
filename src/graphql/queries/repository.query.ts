@@ -9,22 +9,24 @@ gql`
       homepageUrl
       url
       forkCount
+      isFork
+      stargazerCount
     }
   }
 `;
 
-export const lastRepositoriesQuery = gql`
-  query lastRepositories($last: Int!) {
+export const totalRepositories = gql`
+  query totalRepoCount($first: Int!) {
     viewer {
-      repositories(last: $last) {
-        ...RepositoryConnectionFragment
+      repositories(last: $first) {
+        totalCount
       }
     }
   }
 `;
 
-export const firstRepositoriesQuery = gql`
-  query firstRepositories($first: Int!) {
+export const repositoriesQuery = gql`
+  query repositories($first: Int!) {
     viewer {
       repositories(first: $first) {
         ...RepositoryConnectionFragment
