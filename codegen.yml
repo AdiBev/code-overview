@@ -2,7 +2,7 @@ overwrite: true
 schema: "https://api.github.com/graphql"
 documents: "src/**/*.ts"
 headers:
-  Authorization: "token 01330c6cfd5512a21edfb926e3db6828b9c4a381"
+  Authorization: "token access_token"
 generates:
   src/graphql/generated/graphql.tsx:
     plugins:
