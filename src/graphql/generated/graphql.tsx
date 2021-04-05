@@ -1624,7 +1624,7 @@ export type Commit = Node & GitObject & Subscribable & UniformResourceLocatable 
   abbreviatedOid: Scalars['String'];
   /** The number of additions in this commit. */
   additions: Scalars['Int'];
-  /** The pull requests associated with a commit */
+  /** The merged Pull Request that introduced the commit to the repository. If the commit is not present in the default branch, additionally returns open Pull Requests associated with the commit */
   associatedPullRequests?: Maybe<PullRequestConnection>;
   /** Authorship details of the commit. */
   author?: Maybe<GitActor>;
@@ -4479,7 +4479,7 @@ export type EnterprisePendingMemberInvitationEdge = {
 export type EnterpriseRepositoryInfo = Node & {
   __typename?: 'EnterpriseRepositoryInfo';
   id: Scalars['ID'];
-  /** Identifies if the repository is private. */
+  /** Identifies if the repository is private or internal. */
   isPrivate: Scalars['Boolean'];
   /** The repository's name. */
   name: Scalars['String'];
@@ -14399,7 +14399,7 @@ export type Repository = Node & ProjectOwner & PackageOwner & Subscribable & Sta
   isLocked: Scalars['Boolean'];
   /** Identifies if the repository is a mirror. */
   isMirror: Scalars['Boolean'];
-  /** Identifies if the repository is private. */
+  /** Identifies if the repository is private or internal. */
   isPrivate: Scalars['Boolean'];
   /** Returns true if this repository has a security policy */
   isSecurityPolicyEnabled?: Maybe<Scalars['Boolean']>;
@@ -14964,7 +14964,7 @@ export type RepositoryInfo = {
   isLocked: Scalars['Boolean'];
   /** Identifies if the repository is a mirror. */
   isMirror: Scalars['Boolean'];
-  /** Identifies if the repository is private. */
+  /** Identifies if the repository is private or internal. */
   isPrivate: Scalars['Boolean'];
   /** Identifies if the repository is a template that can be used to generate new repositories. */
   isTemplate: Scalars['Boolean'];
@@ -16262,6 +16262,8 @@ export type SponsorsTier = Node & {
   __typename?: 'SponsorsTier';
   /** SponsorsTier information only visible to users that can administer the associated Sponsors listing. */
   adminInfo?: Maybe<SponsorsTierAdminInfo>;
+  /** Get a different tier for this tier's maintainer that is at the same frequency as this tier but with a lesser cost. Returns the published tier with the monthly price closest to this tier's without going over. */
+  closestLesserValueTier?: Maybe<SponsorsTier>;
   /** Identifies the date and time when the object was created. */
   createdAt: Scalars['DateTime'];
   /** The description of the tier. */
@@ -16269,6 +16271,10 @@ export type SponsorsTier = Node & {
   /** The tier description rendered to HTML */
   descriptionHTML: Scalars['HTML'];
   id: Scalars['ID'];
+  /** Whether this tier was chosen at checkout time by the sponsor rather than defined ahead of time by the maintainer who manages the Sponsors listing. */
+  isCustomAmount: Scalars['Boolean'];
+  /** Whether this tier is only for use with one-time sponsorships. */
+  isOneTime: Scalars['Boolean'];
   /** How much this tier costs per month in cents. */
   monthlyPriceInCents: Scalars['Int'];
   /** How much this tier costs per month in dollars. */
@@ -16343,6 +16349,8 @@ export type Sponsorship = Node & {
   /** Identifies the date and time when the object was created. */
   createdAt: Scalars['DateTime'];
   id: Scalars['ID'];
+  /** Whether this sponsorship represents a one-time payment versus a recurring sponsorship. */
+  isOneTimePayment: Scalars['Boolean'];
   /**
    * The entity that is being sponsored
    * @deprecated `Sponsorship.maintainer` will be removed. Use `Sponsorship.sponsorable` instead. Removal on 2020-04-01 UTC.
@@ -19631,7 +19639,7 @@ export type ViewerHovercardContext = HovercardContext & {
 
 export type ProfileFragmentFragment = (
   { __typename?: 'User' }
-  & Pick<User, 'login' | 'bio' | 'name' | 'avatarUrl' | 'company' | 'location'>
+  & Pick<User, 'id' | 'login' | 'bio' | 'name' | 'avatarUrl' | 'company' | 'location'>
   & { followers: (
     { __typename?: 'FollowerConnection' }
     & Pick<FollowerConnection, 'totalCount'>
@@ -19656,32 +19664,32 @@ export type RepositoryConnectionFragmentFragment = (
   { __typename?: 'RepositoryConnection' }
   & { nodes?: Maybe<Array<Maybe<(
     { __typename?: 'Repository' }
-    & Pick<Repository, 'name' | 'createdAt' | 'description' | 'homepageUrl' | 'url'>
+    & Pick<Repository, 'id' | 'name' | 'createdAt' | 'description' | 'homepageUrl' | 'url' | 'forkCount' | 'isFork' | 'stargazerCount'>
   )>>> }
 );
 
-export type LastRepositoriesQueryVariables = Exact<{
-  last: Scalars['Int'];
+export type TotalRepoCountQueryVariables = Exact<{
+  first: Scalars['Int'];
 }>;
 
 
-export type LastRepositoriesQuery = (
+export type TotalRepoCountQuery = (
   { __typename?: 'Query' }
   & { viewer: (
     { __typename?: 'User' }
     & { repositories: (
       { __typename?: 'RepositoryConnection' }
-      & RepositoryConnectionFragmentFragment
+      & Pick<RepositoryConnection, 'totalCount'>
     ) }
   ) }
 );
 
-export type FirstRepositoriesQueryVariables = Exact<{
+export type RepositoriesQueryVariables = Exact<{
   first: Scalars['Int'];
 }>;
 
 
-export type FirstRepositoriesQuery = (
+export type RepositoriesQuery = (
   { __typename?: 'Query' }
   & { viewer: (
     { __typename?: 'User' }
@@ -19694,6 +19702,7 @@ export type FirstRepositoriesQuery = (
 
 export const ProfileFragmentFragmentDoc = gql`
     fragment ProfileFragment on User {
+  id
   login
   bio
   name
@@ -19711,11 +19720,15 @@ export const ProfileFragmentFragmentDoc = gql`
 export const RepositoryConnectionFragmentFragmentDoc = gql`
     fragment RepositoryConnectionFragment on RepositoryConnection {
   nodes {
+    id
     name
     createdAt
     description
     homepageUrl
     url
+    forkCount
+    isFork
+    stargazerCount
   }
 }
     `;
@@ -19753,45 +19766,45 @@ export function useProfileLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<Pr
 export type ProfileQueryHookResult = ReturnType<typeof useProfileQuery>;
 export type ProfileLazyQueryHookResult = ReturnType<typeof useProfileLazyQuery>;
 export type ProfileQueryResult = Apollo.QueryResult<ProfileQuery, ProfileQueryVariables>;
-export const LastRepositoriesDocument = gql`
-    query lastRepositories($last: Int!) {
+export const TotalRepoCountDocument = gql`
+    query totalRepoCount($first: Int!) {
   viewer {
-    repositories(last: $last) {
-      ...RepositoryConnectionFragment
+    repositories(last: $first) {
+      totalCount
     }
   }
 }
-    ${RepositoryConnectionFragmentFragmentDoc}`;
+    `;
 
 /**
- * __useLastRepositoriesQuery__
+ * __useTotalRepoCountQuery__
  *
- * To run a query within a React component, call `useLastRepositoriesQuery` and pass it any options that fit your needs.
- * When your component renders, `useLastRepositoriesQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * To run a query within a React component, call `useTotalRepoCountQuery` and pass it any options that fit your needs.
+ * When your component renders, `useTotalRepoCountQuery` returns an object from Apollo Client that contains loading, error, and data properties
  * you can use to render your UI.
  *
  * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
  *
  * @example
- * const { data, loading, error } = useLastRepositoriesQuery({
+ * const { data, loading, error } = useTotalRepoCountQuery({
  *   variables: {
- *      last: // value for 'last'
+ *      first: // value for 'first'
  *   },
  * });
  */
-export function useLastRepositoriesQuery(baseOptions: Apollo.QueryHookOptions<LastRepositoriesQuery, LastRepositoriesQueryVariables>) {
+export function useTotalRepoCountQuery(baseOptions: Apollo.QueryHookOptions<TotalRepoCountQuery, TotalRepoCountQueryVariables>) {
         const options = {...defaultOptions, ...baseOptions}
-        return Apollo.useQuery<LastRepositoriesQuery, LastRepositoriesQueryVariables>(LastRepositoriesDocument, options);
+        return Apollo.useQuery<TotalRepoCountQuery, TotalRepoCountQueryVariables>(TotalRepoCountDocument, options);
       }
-export function useLastRepositoriesLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<LastRepositoriesQuery, LastRepositoriesQueryVariables>) {
+export function useTotalRepoCountLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<TotalRepoCountQuery, TotalRepoCountQueryVariables>) {
           const options = {...defaultOptions, ...baseOptions}
-          return Apollo.useLazyQuery<LastRepositoriesQuery, LastRepositoriesQueryVariables>(LastRepositoriesDocument, options);
+          return Apollo.useLazyQuery<TotalRepoCountQuery, TotalRepoCountQueryVariables>(TotalRepoCountDocument, options);
         }
-export type LastRepositoriesQueryHookResult = ReturnType<typeof useLastRepositoriesQuery>;
-export type LastRepositoriesLazyQueryHookResult = ReturnType<typeof useLastRepositoriesLazyQuery>;
-export type LastRepositoriesQueryResult = Apollo.QueryResult<LastRepositoriesQuery, LastRepositoriesQueryVariables>;
-export const FirstRepositoriesDocument = gql`
-    query firstRepositories($first: Int!) {
+export type TotalRepoCountQueryHookResult = ReturnType<typeof useTotalRepoCountQuery>;
+export type TotalRepoCountLazyQueryHookResult = ReturnType<typeof useTotalRepoCountLazyQuery>;
+export type TotalRepoCountQueryResult = Apollo.QueryResult<TotalRepoCountQuery, TotalRepoCountQueryVariables>;
+export const RepositoriesDocument = gql`
+    query repositories($first: Int!) {
   viewer {
     repositories(first: $first) {
       ...RepositoryConnectionFragment
@@ -19801,29 +19814,29 @@ export const FirstRepositoriesDocument = gql`
     ${RepositoryConnectionFragmentFragmentDoc}`;
 
 /**
- * __useFirstRepositoriesQuery__
+ * __useRepositoriesQuery__
  *
- * To run a query within a React component, call `useFirstRepositoriesQuery` and pass it any options that fit your needs.
- * When your component renders, `useFirstRepositoriesQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * To run a query within a React component, call `useRepositoriesQuery` and pass it any options that fit your needs.
+ * When your component renders, `useRepositoriesQuery` returns an object from Apollo Client that contains loading, error, and data properties
  * you can use to render your UI.
  *
  * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
  *
  * @example
- * const { data, loading, error } = useFirstRepositoriesQuery({
+ * const { data, loading, error } = useRepositoriesQuery({
  *   variables: {
  *      first: // value for 'first'
  *   },
  * });
  */
-export function useFirstRepositoriesQuery(baseOptions: Apollo.QueryHookOptions<FirstRepositoriesQuery, FirstRepositoriesQueryVariables>) {
+export function useRepositoriesQuery(baseOptions: Apollo.QueryHookOptions<RepositoriesQuery, RepositoriesQueryVariables>) {
         const options = {...defaultOptions, ...baseOptions}
-        return Apollo.useQuery<FirstRepositoriesQuery, FirstRepositoriesQueryVariables>(FirstRepositoriesDocument, options);
+        return Apollo.useQuery<RepositoriesQuery, RepositoriesQueryVariables>(RepositoriesDocument, options);
       }
-export function useFirstRepositoriesLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<FirstRepositoriesQuery, FirstRepositoriesQueryVariables>) {
+export function useRepositoriesLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<RepositoriesQuery, RepositoriesQueryVariables>) {
           const options = {...defaultOptions, ...baseOptions}
-          return Apollo.useLazyQuery<FirstRepositoriesQuery, FirstRepositoriesQueryVariables>(FirstRepositoriesDocument, options);
+          return Apollo.useLazyQuery<RepositoriesQuery, RepositoriesQueryVariables>(RepositoriesDocument, options);
         }
-export type FirstRepositoriesQueryHookResult = ReturnType<typeof useFirstRepositoriesQuery>;
-export type FirstRepositoriesLazyQueryHookResult = ReturnType<typeof useFirstRepositoriesLazyQuery>;
-export type FirstRepositoriesQueryResult = Apollo.QueryResult<FirstRepositoriesQuery, FirstRepositoriesQueryVariables>;
+export type RepositoriesQueryHookResult = ReturnType<typeof useRepositoriesQuery>;
+export type RepositoriesLazyQueryHookResult = ReturnType<typeof useRepositoriesLazyQuery>;
+export type RepositoriesQueryResult = Apollo.QueryResult<RepositoriesQuery, RepositoriesQueryVariables>;
